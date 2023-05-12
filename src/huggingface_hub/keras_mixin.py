@@ -199,16 +199,15 @@ def save_pretrained_keras(
         else:
             metadata["tags"] = [task_name]
 
-    if model.history is not None:
-        if model.history.history != {}:
-            path = save_directory / "history.json"
-            if path.exists():
-                warnings.warn(
-                    "`history.json` file already exists, it will be overwritten by the history of this version.",
-                    UserWarning,
-                )
-            with path.open("w", encoding="utf-8") as f:
-                json.dump(model.history.history, f, indent=2, sort_keys=True)
+    if model.history is not None and model.history.history != {}:
+        path = save_directory / "history.json"
+        if path.exists():
+            warnings.warn(
+                "`history.json` file already exists, it will be overwritten by the history of this version.",
+                UserWarning,
+            )
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(model.history.history, f, indent=2, sort_keys=True)
 
     _create_model_card(model, save_directory, plot_model, metadata)
     tf.keras.models.save_model(model, save_directory, include_optimizer=include_optimizer, **model_save_kwargs)

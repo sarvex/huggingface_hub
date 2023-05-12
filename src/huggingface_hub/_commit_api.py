@@ -174,7 +174,7 @@ class CommitOperationAdd:
         config.json: 100%|█████████████████████████| 8.19k/8.19k [00:02<00:00, 3.72kB/s]
         ```
         """
-        if isinstance(self.path_or_fileobj, str) or isinstance(self.path_or_fileobj, Path):
+        if isinstance(self.path_or_fileobj, (str, Path)):
             if with_tqdm:
                 with tqdm_stream_file(self.path_or_fileobj) as file:
                     yield file
@@ -200,13 +200,10 @@ class CommitOperationAdd:
 
 def _validate_path_in_repo(path_in_repo: str) -> str:
     # Validate `path_in_repo` value to prevent a server-side issue
-    if path_in_repo.startswith("/"):
-        path_in_repo = path_in_repo[1:]
+    path_in_repo = path_in_repo.removeprefix("/")
     if path_in_repo == "." or path_in_repo == ".." or path_in_repo.startswith("../"):
         raise ValueError(f"Invalid `path_in_repo` in CommitOperation: '{path_in_repo}'")
-    if path_in_repo.startswith("./"):
-        path_in_repo = path_in_repo[2:]
-    return path_in_repo
+    return path_in_repo.removeprefix("./")
 
 
 CommitOperation = Union[CommitOperationAdd, CommitOperationDelete]
@@ -242,20 +239,22 @@ def warn_on_overwriting_operations(operations: List[CommitOperation]) -> None:
                 # Also keep track of number of updated files per folder
                 # => warns if deleting a folder overwrite some contained files
                 nb_additions_per_path[str(parent)] += 1
-        if isinstance(operation, CommitOperationDelete):
-            if nb_additions_per_path[str(PurePosixPath(path_in_repo))] > 0:
-                if operation.is_folder:
-                    warnings.warn(
-                        "About to delete a folder containing files that have just been"
-                        f" updated within the same commit: '{path_in_repo}'. This can"
-                        " cause undesired inconsistencies in your repo."
-                    )
-                else:
-                    warnings.warn(
-                        "About to delete a file that have just been updated within the"
-                        f" same commit: '{path_in_repo}'. This can cause undesired"
-                        " inconsistencies in your repo."
-                    )
+        if (
+            isinstance(operation, CommitOperationDelete)
+            and nb_additions_per_path[str(PurePosixPath(path_in_repo))] > 0
+        ):
+            if operation.is_folder:
+                warnings.warn(
+                    "About to delete a folder containing files that have just been"
+                    f" updated within the same commit: '{path_in_repo}'. This can"
+                    " cause undesired inconsistencies in your repo."
+                )
+            else:
+                warnings.warn(
+                    "About to delete a file that have just been updated within the"
+                    f" same commit: '{path_in_repo}'. This can cause undesired"
+                    " inconsistencies in your repo."
+                )
 
 
 @validate_hf_hub_args
@@ -333,7 +332,7 @@ def upload_lfs_files(
         else:
             filtered_actions.append(action)
 
-    if len(filtered_actions) == 0:
+    if not filtered_actions:
         logger.debug("No LFS files to upload.")
         return
 
